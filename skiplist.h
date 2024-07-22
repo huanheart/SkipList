@@ -115,11 +115,11 @@ enum DecideExist
 
 
 //跳表部分
-template<typename K,typename V>
+template<typename K,typename V,typename Compare=std::less<K> >
 class SkipList
 {
 public:
-    SkipList(int );
+    SkipList(int ,Compare comp =Compare() );
     ~SkipList();
     V& operator[](const K& );
     int insert_element(K,V);
@@ -152,18 +152,20 @@ private:
 
     //当前跳表中含有的数量
     int _element_count;
+    // 比较规则
+    Compare comp;
 };
 
-template<typename K, typename V>
-Node<K, V>* SkipList<K,V>::create_node(const K k,const V v,int level)
+template<typename K, typename V, typename Compare>
+Node<K, V>* SkipList<K,V,Compare>::create_node(const K k,const V v,int level)
 {
     Node<K, V>* back=new Node<K, V>(k,v,level);
     return back;
 }
 
 //跳表中的插入
-template<typename K, typename V>
-int SkipList<K, V>::insert_element(const K key, const V value)
+template<typename K, typename V, typename Compare>
+int SkipList<K, V,Compare>::insert_element(const K key, const V value)
 {
     mtx.lock();
     Node<K,V>* current=this->_header;
@@ -174,7 +176,7 @@ int SkipList<K, V>::insert_element(const K key, const V value)
 
     //从最高层开始查找这个元素应该被放入到哪里
     for(int i=_skip_list_level;i>=0;i--){
-        while(current->forward[i]!=nullptr && current->forward[i]->get_key()<key){
+        while(current->forward[i]!=nullptr && comp(current->forward[i]->get_key(),key) ){
             current=current->forward[i];
         }
         update[i]=current;
@@ -213,14 +215,14 @@ int SkipList<K, V>::insert_element(const K key, const V value)
 }
 
 //获取跳表中存储的元素个数
-template<typename K, typename V> 
-int SkipList<K, V>::size() { 
+template<typename K, typename V, typename Compare>
+int SkipList<K, V,Compare>::size() { 
     return _element_count;
 }
 
 //展示跳表中的结构
-template<typename K, typename V> 
-void SkipList<K,V>::display_list()
+template<typename K, typename V, typename Compare>
+void SkipList<K,V,Compare>::display_list()
 {
     std::cout<<"Now let's start showing the SkipList"<<std::endl;
     for(int i=0;i<=_skip_list_level;i++)
@@ -237,8 +239,8 @@ void SkipList<K,V>::display_list()
 }
 
 //将内存中的数据持久化到文件中
-template<typename K, typename V> 
-void SkipList<K, V>::dump_file() {
+template<typename K, typename V, typename Compare>
+void SkipList<K, V,Compare>::dump_file() {
 
     std::cout << "dump_file-----------------" << std::endl;
     _file_writer.open(STORE_FILE);
@@ -256,8 +258,8 @@ void SkipList<K, V>::dump_file() {
 }
 
 //将文件中的数据加载到内存中
-template<typename K, typename V> 
-void SkipList<K, V>::load_file() {
+template<typename K, typename V, typename Compare>
+void SkipList<K, V,Compare>::load_file() {
 
     _file_reader.open(STORE_FILE);
     std::cout << "load_file-----------------" << std::endl;
@@ -278,8 +280,8 @@ void SkipList<K, V>::load_file() {
     _file_reader.close();
 }
 
-template<typename K, typename V>
-bool SkipList<K,V>::is_valid_string(const std::string &str)
+template<typename K, typename V, typename Compare>
+bool SkipList<K,V,Compare>::is_valid_string(const std::string &str)
 {
     //查看是否为空以及查看能否找到分隔符
     if(str.empty()||str.find(delimiter)==std::string::npos)
@@ -288,8 +290,8 @@ bool SkipList<K,V>::is_valid_string(const std::string &str)
 }
 
 
-template<typename K, typename V>
-void SkipList<K,V>::get_key_value_from_string(const std::string& str,std::string* key,std::string * value)
+template<typename K, typename V, typename Compare>
+void SkipList<K,V,Compare>::get_key_value_from_string(const std::string& str,std::string* key,std::string * value)
 {
     if(!is_valid_string(str))
         return ;
@@ -298,8 +300,8 @@ void SkipList<K,V>::get_key_value_from_string(const std::string& str,std::string
 }
 
 //删除元素
-template<typename K, typename V> 
-void SkipList<K, V>::delete_element(K key)
+template<typename K, typename V, typename Compare>
+void SkipList<K, V,Compare>::delete_element(K key)
 {
     mtx.lock();
     Node<K,V> * current =this->_header;
@@ -309,7 +311,7 @@ void SkipList<K, V>::delete_element(K key)
     // 从最高层开始去寻找,通过先向同层的右边走，再往下走
     for(int i=_skip_list_level;i>=0;i--)
     {
-        while(current->forward[i]!=nullptr && current->forward[i]->get_key()<key){
+        while(current->forward[i]!=nullptr && comp(current->forward[i]->get_key(),key) ){
             current=current->forward[i];
         }
         update[i]=current;
@@ -334,15 +336,15 @@ void SkipList<K, V>::delete_element(K key)
 }
 
 //内部查找元素用的
-template<typename K, typename V> 
-Node<K,V> * SkipList<K, V>::internal_search_element(K key)
+template<typename K, typename V, typename Compare>
+Node<K,V> * SkipList<K, V,Compare>::internal_search_element(K key)
 {
     std::cout << "  internal_search_element-----------------" << std::endl;
     Node<K,V> * current=_header;
     //从最高层去找,先同层往右，然后向下去找
     for(int i=_skip_list_level;i>=0;i--)
     {
-        while(current->forward[i] && current->forward[i]->get_key() < key){
+        while(current->forward[i] && comp(current->forward[i]->get_key(),key) ){
             current=current->forward[i];
         }
     }
@@ -360,15 +362,15 @@ Node<K,V> * SkipList<K, V>::internal_search_element(K key)
 
 
 //外部查找元素，用于判断元素是否存在
-template<typename K, typename V> 
-bool SkipList<K, V>::search_element(K key)
+template<typename K, typename V, typename Compare>
+bool SkipList<K, V,Compare>::search_element(K key)
 {
     std::cout << "search_element-----------------" << std::endl;
     Node<K,V> * current=_header;
     //从最高层去找,先同层往右，然后向下去找
     for(int i=_skip_list_level;i>=0;i--)
     {
-        while(current->forward[i] && current->forward[i]->get_key() < key){
+        while(current->forward[i] && comp(current->forward[i]->get_key(),key) ){
             current=current->forward[i];
         }
     }
@@ -386,21 +388,20 @@ bool SkipList<K, V>::search_element(K key)
 
 
 //建造一个跳表
-template<typename K, typename V> 
-SkipList<K, V>::SkipList(int max_level) {
+template<typename K, typename V, typename Compare>
+SkipList<K, V,Compare>::SkipList(int max_level,Compare comp) {
 
     this->_max_level = max_level;
     this->_skip_list_level = 0;
     this->_element_count = 0;
-
-    // create header node and initialize key and value to null
+    this->comp=comp; //初始化比较规则
     K k;
     V v;
     this->_header = new Node<K, V>(k, v, _max_level);
 };
 
-template<typename K, typename V> 
-SkipList<K, V>::~SkipList() 
+template<typename K, typename V, typename Compare>
+SkipList<K, V,Compare>::~SkipList() 
 {
     if (_file_writer.is_open()) {
         _file_writer.close();
@@ -416,8 +417,8 @@ SkipList<K, V>::~SkipList()
 }
 
 //递归遍历第0层进行一个删除
-template <typename K, typename V>
-void SkipList<K, V>::clear(Node<K,V> * cur)
+template<typename K, typename V, typename Compare>
+void SkipList<K, V,Compare>::clear(Node<K,V> * cur)
 {
     if(cur->forward[0]!=nullptr){
         clear(cur->forward[0]);
@@ -426,8 +427,8 @@ void SkipList<K, V>::clear(Node<K,V> * cur)
 }
 
 //随机一个元素的层数,这也是为什么空间复杂度会是o(NlogN)的原因
-template <typename K, typename V>
-int SkipList<K, V>::get_random_level()
+template<typename K, typename V, typename Compare>
+int SkipList<K, V,Compare>::get_random_level()
 {
     int k=1;
     while(rand()%2){
@@ -437,16 +438,16 @@ int SkipList<K, V>::get_random_level()
     return k;
 }
 
-template <typename K, typename V>
-bool SkipList<K, V>::update(K key,V old_value,V new_value)
+template<typename K, typename V, typename Compare>
+bool SkipList<K, V,Compare>::update(K key,V old_value,V new_value)
 {
     delete_element(key);
     insert_element(key,new_value);
     return true;
 }
 
-template <typename K, typename V>
-V& SkipList<K, V>::operator[](const K& key)
+template<typename K, typename V, typename Compare>
+V& SkipList<K, V,Compare>::operator[](const K& key)
 {
     //先查找一下是否存在这个key
     Node<K,V> *back =internal_search_element(key);
